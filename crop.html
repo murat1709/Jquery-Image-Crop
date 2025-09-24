@@ -1,180 +1,611 @@
-<input type="file" id="avatar" accept="image/*"><br>
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resim Kırpma Uygulaması</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .upload-section {
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .upload-section label {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .upload-section label:hover {
+            background: #0056b3;
+        }
+        
+        #avatar {
+            display: none;
+        }
+        
+        .crop-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            overflow: auto;
+        }
+        
+        .crop-content {
+            position: relative;
+            margin: 20px auto;
+            max-width: 90%;
+            max-height: 90%;
+            text-align: center;
+        }
+        
+        .crop-container {
+            position: relative;
+            display: inline-block;
+            margin: 20px;
+        }
+        
+        .crop-image {
+            max-width: 100%;
+            max-height: 70vh;
+            display: block;
+            margin: 0 auto;
+            border: 1px solid #ddd;
+        }
+        
+        .crop-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            cursor: crosshair;
+        }
+        
+        .crop-selection {
+            position: absolute;
+            border: 2px solid #007bff;
+            background: transparent;
+            cursor: move;
+            min-width: 50px;
+            min-height: 50px;
+        }
+        
+        .crop-selection::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            border: 2px dashed white;
+        }
+        
+        .resize-handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #007bff;
+            border: 2px solid white;
+            border-radius: 50%;
+        }
+        
+        .resize-handle.nw { top: -5px; left: -5px; cursor: nw-resize; }
+        .resize-handle.ne { top: -5px; right: -5px; cursor: ne-resize; }
+        .resize-handle.sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+        .resize-handle.se { bottom: -5px; right: -5px; cursor: se-resize; }
+        
+        .crop-buttons {
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .preview-section {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        
+        #result {
+            max-width: 200px;
+            max-height: 200px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            display: none;
+            margin: 10px 0;
+        }
+        
+        .coords-info {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .coord-input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+        }
+        
+        .coord-label {
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 5px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Resim Kırpma Uygulaması</h2>
+        
+        <div class="upload-section">
+            <label for="avatar">
+                📷 Resim Seç
+                <input type="file" id="avatar" accept="image/*">
+            </label>
+            <p>Kırpmak istediğiniz resmi seçin (JPG, PNG)</p>
+        </div>
+        
+        <div class="preview-section">
+            <h3>Kırpılmış Resim Önizlemesi</h3>
+            <img id="result" alt="Kırpılmış resim önizlemesi">
+            
+            <div class="coords-info">
+                <div>
+                    <label class="coord-label">Genişlik (px)</label>
+                    <input type="number" id="avatar_width" class="coord-input" readonly>
+                </div>
+                <div>
+                    <label class="coord-label">Yükseklik (px)</label>
+                    <input type="number" id="avatar_height" class="coord-input" readonly>
+                </div>
+                <div>
+                    <label class="coord-label">X Koordinatı</label>
+                    <input type="number" id="avatar_x" class="coord-input" readonly>
+                </div>
+                <div>
+                    <label class="coord-label">Y Koordinatı</label>
+                    <input type="number" id="avatar_y" class="coord-input" readonly>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Kırpma Modal -->
+    <div class="crop-modal" id="cropModal">
+        <div class="crop-content">
+            <div class="crop-container">
+                <img class="crop-image" id="cropImage" alt="Kırpılacak resim">
+                <div class="crop-overlay" id="cropOverlay">
+                    <div class="crop-selection" id="cropSelection">
+                        <div class="resize-handle nw"></div>
+                        <div class="resize-handle ne"></div>
+                        <div class="resize-handle sw"></div>
+                        <div class="resize-handle se"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="crop-buttons">
+                <button class="btn btn-primary" id="cropBtn">Kırp</button>
+                <button class="btn btn-secondary" id="cancelBtn">İptal</button>
+            </div>
+        </div>
+    </div>
 
-<!-- Kırpma penceresi -->
-<div id="cropModal" style="display:none; position:fixed; top:10%; left:10%; width:80%; height:80%; background:#fff; border:1px solid #ccc; z-index:9999;">
-  <canvas id="cropCanvas" style="background:#222; display:block; margin:10px auto; cursor:crosshair;"></canvas>
-  <button id="cropConfirm">Kırp ve Önizle</button>
-  <button id="cropCancel">İptal</button>
-</div>
-
-<!-- Sonuç ve bilgiler -->
-<img id="result" style="display:block; margin-top:10px; max-width:200px;"/>
-<br>
-<input type="text" id="avatar_x" readonly placeholder="X Koordinatı">
-<input type="text" id="avatar_y" readonly placeholder="Y Koordinatı">
-<input type="text" id="avatar_width" readonly placeholder="Genişlik">
-<input type="text" id="avatar_height" readonly placeholder="Yükseklik">
-
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
-$(function() {
-  let img = new Image();
-  let cropStart = null;
-  let cropSize = 0;
-  let isDragging = false;
-  let canvas, ctx;
-  let naturalImgWidth, naturalImgHeight;
-  let offsetX, offsetY;
-  let scaleX, scaleY;
-
-  $("#avatar").on('change', function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(event) {
-      img.src = event.target.result;
-      img.onload = function() {
-        openCropper();
-      };
-    };
-    reader.readAsDataURL(file);
-  });
-
-  function openCropper() {
-    $("#cropModal").show();
-    canvas = document.getElementById('cropCanvas');
-    ctx = canvas.getContext('2d');
-
-    // Canvas boyutları, modal büyüklüğüne göre
-    const maxWidth = $("#cropModal").width() - 40;
-    const maxHeight = $("#cropModal").height() - 90;
-    let ratio = Math.min(maxWidth / img.width, maxHeight / img.height, 1);
-    canvas.width = img.width * ratio;
-    canvas.height = img.height * ratio;
-
-    naturalImgWidth = img.width;
-    naturalImgHeight = img.height;
-
-    // Resmi canvas boyutuna göre ölçeklendirme katsayıları
-    scaleX = naturalImgWidth / canvas.width;
-    scaleY = naturalImgHeight / canvas.height;
-
-    offsetX = canvas.getBoundingClientRect().left;
-    offsetY = canvas.getBoundingClientRect().top;
-
-    drawCanvas();
-
-    // Mouse olayları
-    $(canvas)
-      .off('mousedown mousemove mouseup')
-      .on('mousedown', startCrop)
-      .on('mousemove', duringCrop)
-      .on('mouseup', endCrop);
-  }
-
-  function drawCanvas(cropRect) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-    if (cropRect) {
-      // Kırpma dışındaki alan optik koyulukla kapatılır
-      ctx.fillStyle = "rgba(0,0,0,0.5)";
-      // Üst
-      ctx.fillRect(0, 0, canvas.width, cropRect.y);
-      // Alt
-      ctx.fillRect(0, cropRect.y + cropRect.size, canvas.width, canvas.height - (cropRect.y + cropRect.size));
-      // Sol
-      ctx.fillRect(0, cropRect.y, cropRect.x, cropRect.size);
-      // Sağ
-      ctx.fillRect(cropRect.x + cropRect.size, cropRect.y, canvas.width - (cropRect.x + cropRect.size), cropRect.size);
-
-      // Kırpma alanı çerçevesi
-      ctx.strokeStyle = '#0f0';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(cropRect.x, cropRect.y, cropRect.size, cropRect.size);
-    }
-  }
-
-  function startCrop(e) {
-    isDragging = true;
-    let rect = canvas.getBoundingClientRect();
-    cropStart = {
-      x: Math.min(Math.max(e.clientX - rect.left, 0), canvas.width),
-      y: Math.min(Math.max(e.clientY - rect.top, 0), canvas.height)
-    };
-  }
-
-  function duringCrop(e) {
-    if (!isDragging) return;
-    let rect = canvas.getBoundingClientRect();
-    let currentX = Math.min(Math.max(e.clientX - rect.left, 0), canvas.width);
-    let currentY = Math.min(Math.max(e.clientY - rect.top, 0), canvas.height);
-
-    let side = Math.min(Math.abs(currentX - cropStart.x), Math.abs(currentY - cropStart.y));
-
-    let cropRect = {
-      x: currentX < cropStart.x ? cropStart.x - side : cropStart.x,
-      y: currentY < cropStart.y ? cropStart.y - side : cropStart.y,
-      size: side
-    };
-
-    drawCanvas(cropRect);
-  }
-
-  function endCrop(e) {
-    if (!isDragging) return;
-    isDragging = false;
-
-    let rect = canvas.getBoundingClientRect();
-    let endX = Math.min(Math.max(e.clientX - rect.left, 0), canvas.width);
-    let endY = Math.min(Math.max(e.clientY - rect.top, 0), canvas.height);
-
-    let side = Math.min(Math.abs(endX - cropStart.x), Math.abs(endY - cropStart.y));
-    let cropX = endX < cropStart.x ? cropStart.x - side : cropStart.x;
-    let cropY = endY < cropStart.y ? cropStart.y - side : cropStart.y;
-
-    // Son kırpma koordinatlarını ve boyutunu sakla
-    cropStart = { x: cropX, y: cropY };
-    cropSize = side;
-
-    drawCanvas({x: cropX, y: cropY, size: side});
-  }
-
-  // Kırp ve önizle butonu
-  $('#cropConfirm').on('click', function() {
-    if (cropSize <= 0) {
-      alert("Lütfen kırpma alanı seçin.");
-      return;
-    }
-
-    // Kırpılan alanı orijinal resim boyutuna göre hesapla
-    let sx = cropStart.x * scaleX;
-    let sy = cropStart.y * scaleY;
-    let sSize = cropSize * scaleX; // scaleX ve scaleY eşit çünkü oran aynı
-
-    // Kırpılan resmi canvas'a aktar
-    let cropCanvas = document.createElement('canvas');
-    cropCanvas.width = sSize;
-    cropCanvas.height = sSize;
-    let cropCtx = cropCanvas.getContext('2d');
-    cropCtx.drawImage(img, sx, sy, sSize, sSize, 0, 0, sSize, sSize);
-
-    // Kırpılan resmi base64 olarak alıp preview olarak göster
-    let croppedDataUrl = cropCanvas.toDataURL('image/png');
-    $('#result').attr('src', croppedDataUrl);
-
-    // Ölçü ve koordinatları inputlara yaz
-    $('#avatar_x').val(Math.round(sx));
-    $('#avatar_y').val(Math.round(sy));
-    $('#avatar_width').val(Math.round(sSize));
-    $('#avatar_height').val(Math.round(sSize));
-
-    $("#cropModal").hide();
-  });
-
-  $('#cropCancel').on('click', function() {
-    $("#cropModal").hide();
-  });
-});
-</script>
+    <script>
+        $(document).ready(function() {
+            let currentImage = null;
+            let isDragging = false;
+            let isResizing = false;
+            let dragStart = { x: 0, y: 0 };
+            let selectionStart = { x: 0, y: 0, width: 0, height: 0 };
+            let resizeHandle = null;
+            
+            // Dosya seçildiğinde modal aç
+            $('#avatar').on('change', function(e) {
+                const file = e.target.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        currentImage = e.target.result;
+                        const cropImage = $('#cropImage');
+                        
+                        // Önce resmi yükle, sonra modal'ı aç
+                        cropImage.attr('src', currentImage);
+                        
+                        // Resim tam yüklendiğinde modal'ı aç ve seçim alanı oluştur
+                        cropImage.on('load', function() {
+                            $('#cropModal').fadeIn();
+                            setTimeout(initializeCropSelection, 200);
+                        });
+                        
+                        // Eğer resim cache'den gelirse load eventi çalışmayabilir
+                        if (cropImage[0].complete) {
+                            $('#cropModal').fadeIn();
+                            setTimeout(initializeCropSelection, 200);
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    alert('Lütfen geçerli bir resim dosyası seçin (JPG, PNG)');
+                }
+            });
+            
+            // Varsayılan kırpma alanını başlat
+            function initializeCropSelection() {
+                console.log('Kırpma alanı başlatılıyor...');
+                const img = $('#cropImage')[0];
+                
+                if (!img || !img.clientWidth || !img.clientHeight) {
+                    console.log('Resim henüz yüklenmedi, tekrar deneniyor...');
+                    setTimeout(initializeCropSelection, 100);
+                    return;
+                }
+                
+                console.log('Resim boyutları:', img.clientWidth, 'x', img.clientHeight);
+                
+                const imgRect = img.getBoundingClientRect();
+                const overlay = $('#cropOverlay');
+                const overlayRect = overlay[0].getBoundingClientRect();
+                
+                // Göreli konumları hesapla
+                const offsetX = imgRect.left - overlayRect.left;
+                const offsetY = imgRect.top - overlayRect.top;
+                
+                // Resmin merkezinde kare alan oluştur
+                const size = Math.min(img.clientWidth, img.clientHeight) * 0.5;
+                const x = offsetX + (img.clientWidth - size) / 2;
+                const y = offsetY + (img.clientHeight - size) / 2;
+                
+                console.log('Seçim alanı:', x, y, size);
+                
+                updateCropSelection(x, y, size, size);
+                updateOverlayMask();
+            }
+            
+            // Kırpma seçimini güncelle
+            function updateCropSelection(x, y, width, height) {
+                const selection = $('#cropSelection');
+                selection.css({
+                    left: x + 'px',
+                    top: y + 'px',
+                    width: width + 'px',
+                    height: height + 'px'
+                });
+            }
+            
+            // Overlay maskını güncelle
+            function updateOverlayMask() {
+                const selection = $('#cropSelection');
+                const overlay = $('#cropOverlay');
+                const pos = selection.position();
+                const width = selection.outerWidth();
+                const height = selection.outerHeight();
+                
+                // CSS ile masklama efekti
+                const maskValue = `
+                    polygon(
+                        0% 0%, 
+                        0% 100%, 
+                        ${pos.left}px 100%, 
+                        ${pos.left}px ${pos.top}px, 
+                        ${pos.left + width}px ${pos.top}px, 
+                        ${pos.left + width}px ${pos.top + height}px, 
+                        ${pos.left}px ${pos.top + height}px, 
+                        ${pos.left}px 100%, 
+                        100% 100%, 
+                        100% 0%
+                    )
+                `;
+                
+                overlay.css({
+                    'clip-path': maskValue,
+                    '-webkit-clip-path': maskValue
+                });
+            }
+            
+            // Mouse olayları - Overlay üzerinde yeni seçim başlatma
+            $('#cropOverlay').on('mousedown', function(e) {
+                if ($(e.target).hasClass('resize-handle')) {
+                    startResize(e);
+                } else if ($(e.target).hasClass('crop-selection')) {
+                    startDrag(e);
+                } else {
+                    startNewSelection(e);
+                }
+                e.preventDefault();
+            });
+            
+            // Yeni seçim başlat
+            function startNewSelection(e) {
+                const overlay = $('#cropOverlay');
+                const offset = overlay.offset();
+                const startX = e.pageX - offset.left;
+                const startY = e.pageY - offset.top;
+                
+                isDragging = true;
+                selectionStart = { x: startX, y: startY, width: 0, height: 0 };
+                
+                updateCropSelection(startX, startY, 0, 0);
+            }
+            
+            // Sürükleme başlat
+            function startDrag(e) {
+                isDragging = true;
+                const selection = $('#cropSelection');
+                const pos = selection.position();
+                dragStart = {
+                    x: e.pageX - pos.left,
+                    y: e.pageY - pos.top
+                };
+            }
+            
+            // Yeniden boyutlandırma başlat
+            function startResize(e) {
+                isResizing = true;
+                resizeHandle = $(e.target).attr('class').split(' ')[1];
+                e.stopPropagation();
+            }
+            
+            // Mouse hareket
+            $(document).on('mousemove', function(e) {
+                if (isDragging && !isResizing) {
+                    if (selectionStart.width === 0) {
+                        // Yeni seçim oluştur
+                        const overlay = $('#cropOverlay');
+                        const offset = overlay.offset();
+                        const currentX = e.pageX - offset.left;
+                        const currentY = e.pageY - offset.top;
+                        
+                        const width = Math.abs(currentX - selectionStart.x);
+                        const height = Math.abs(currentY - selectionStart.y);
+                        const size = Math.min(width, height); // Kare yapmak için
+                        
+                        const x = currentX > selectionStart.x ? selectionStart.x : selectionStart.x - size;
+                        const y = currentY > selectionStart.y ? selectionStart.y : selectionStart.y - size;
+                        
+                        updateCropSelection(x, y, size, size);
+                    } else {
+                        // Mevcut seçimi sürükle
+                        const overlay = $('#cropOverlay');
+                        const offset = overlay.offset();
+                        const newX = e.pageX - offset.left - dragStart.x;
+                        const newY = e.pageY - offset.top - dragStart.y;
+                        
+                        const selection = $('#cropSelection');
+                        const width = selection.outerWidth();
+                        const height = selection.outerHeight();
+                        
+                        // Sınırları kontrol et
+                        const img = $('#cropImage')[0];
+                        const imgRect = img.getBoundingClientRect();
+                        const overlayRect = overlay[0].getBoundingClientRect();
+                        const imgOffsetX = imgRect.left - overlayRect.left;
+                        const imgOffsetY = imgRect.top - overlayRect.top;
+                        
+                        const maxX = imgOffsetX + img.clientWidth - width;
+                        const maxY = imgOffsetY + img.clientHeight - height;
+                        
+                        const boundedX = Math.max(imgOffsetX, Math.min(maxX, newX));
+                        const boundedY = Math.max(imgOffsetY, Math.min(maxY, newY));
+                        
+                        updateCropSelection(boundedX, boundedY, width, height);
+                    }
+                    updateOverlayMask();
+                } else if (isResizing) {
+                    handleResize(e);
+                }
+            });
+            
+            // Yeniden boyutlandırma işle
+            function handleResize(e) {
+                const overlay = $('#cropOverlay');
+                const offset = overlay.offset();
+                const mouseX = e.pageX - offset.left;
+                const mouseY = e.pageY - offset.top;
+                const selection = $('#cropSelection');
+                const pos = selection.position();
+                const currentWidth = selection.outerWidth();
+                const currentHeight = selection.outerHeight();
+                
+                let newX = pos.left;
+                let newY = pos.top;
+                let newSize = currentWidth;
+                
+                // Resim sınırları
+                const img = $('#cropImage')[0];
+                const imgRect = img.getBoundingClientRect();
+                const overlayRect = overlay[0].getBoundingClientRect();
+                const imgOffsetX = imgRect.left - overlayRect.left;
+                const imgOffsetY = imgRect.top - overlayRect.top;
+                const imgMaxX = imgOffsetX + img.clientWidth;
+                const imgMaxY = imgOffsetY + img.clientHeight;
+                
+                switch(resizeHandle) {
+                    case 'se':
+                        newSize = Math.min(
+                            Math.abs(mouseX - pos.left),
+                            Math.abs(mouseY - pos.top),
+                            imgMaxX - pos.left,
+                            imgMaxY - pos.top
+                        );
+                        break;
+                    case 'sw':
+                        newSize = Math.min(
+                            Math.abs(pos.left + currentWidth - mouseX),
+                            Math.abs(mouseY - pos.top),
+                            pos.left + currentWidth - imgOffsetX,
+                            imgMaxY - pos.top
+                        );
+                        newX = pos.left + currentWidth - newSize;
+                        break;
+                    case 'ne':
+                        newSize = Math.min(
+                            Math.abs(mouseX - pos.left),
+                            Math.abs(pos.top + currentHeight - mouseY),
+                            imgMaxX - pos.left,
+                            pos.top + currentHeight - imgOffsetY
+                        );
+                        newY = pos.top + currentHeight - newSize;
+                        break;
+                    case 'nw':
+                        newSize = Math.min(
+                            Math.abs(pos.left + currentWidth - mouseX),
+                            Math.abs(pos.top + currentHeight - mouseY),
+                            pos.left + currentWidth - imgOffsetX,
+                            pos.top + currentHeight - imgOffsetY
+                        );
+                        newX = pos.left + currentWidth - newSize;
+                        newY = pos.top + currentHeight - newSize;
+                        break;
+                }
+                
+                newSize = Math.max(50, newSize); // Minimum boyut
+                updateCropSelection(newX, newY, newSize, newSize);
+                updateOverlayMask();
+            }
+            
+            // Mouse bırak
+            $(document).on('mouseup', function() {
+                isDragging = false;
+                isResizing = false;
+                resizeHandle = null;
+                selectionStart = { x: 0, y: 0, width: 0, height: 0 };
+            });
+            
+            // Kırpma işlemi
+            $('#cropBtn').on('click', function() {
+                cropImage();
+            });
+            
+            // İptal
+            $('#cancelBtn').on('click', function() {
+                $('#cropModal').fadeOut();
+                $('#avatar').val(''); // Input'u temizle
+            });
+            
+            // Resmi kırp
+            function cropImage() {
+                const img = $('#cropImage')[0];
+                const selection = $('#cropSelection');
+                const pos = selection.position();
+                const selectionWidth = selection.outerWidth();
+                const selectionHeight = selection.outerHeight();
+                
+                // Resim boyutları
+                const imgRect = img.getBoundingClientRect();
+                const overlay = $('#cropOverlay');
+                const overlayRect = overlay[0].getBoundingClientRect();
+                const imgOffsetX = imgRect.left - overlayRect.left;
+                const imgOffsetY = imgRect.top - overlayRect.top;
+                
+                // Orijinal resim boyutlarına göre kırpma koordinatları
+                const scaleX = img.naturalWidth / img.clientWidth;
+                const scaleY = img.naturalHeight / img.clientHeight;
+                
+                const cropX = Math.round((pos.left - imgOffsetX) * scaleX);
+                const cropY = Math.round((pos.top - imgOffsetY) * scaleY);
+                const cropWidth = Math.round(selectionWidth * scaleX);
+                const cropHeight = Math.round(selectionHeight * scaleY);
+                
+                // Canvas ile kırpma
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                canvas.width = cropWidth;
+                canvas.height = cropHeight;
+                
+                ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+                
+                // Sonucu göster
+                const croppedDataUrl = canvas.toDataURL('image/png');
+                $('#result').attr('src', croppedDataUrl).show();
+                
+                // Koordinatları güncelle
+                $('#avatar_x').val(cropX);
+                $('#avatar_y').val(cropY);
+                $('#avatar_width').val(cropWidth);
+                $('#avatar_height').val(cropHeight);
+                
+                // Modal'ı kapat
+                $('#cropModal').fadeOut();
+                
+                console.log('Kırpma koordinatları:', {
+                    x: cropX,
+                    y: cropY,
+                    width: cropWidth,
+                    height: cropHeight
+                });
+            }
+            
+            // Modal dışına tıklama
+            $('#cropModal').on('click', function(e) {
+                if (e.target === this) {
+                    $('#cancelBtn').click();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
