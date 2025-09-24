@@ -1,0 +1,180 @@
+<input type="file" id="avatar" accept="image/*"><br>
+
+<!-- Kırpma penceresi -->
+<div id="cropModal" style="display:none; position:fixed; top:10%; left:10%; width:80%; height:80%; background:#fff; border:1px solid #ccc; z-index:9999;">
+  <canvas id="cropCanvas" style="background:#222; display:block; margin:10px auto; cursor:crosshair;"></canvas>
+  <button id="cropConfirm">Kırp ve Önizle</button>
+  <button id="cropCancel">İptal</button>
+</div>
+
+<!-- Sonuç ve bilgiler -->
+<img id="result" style="display:block; margin-top:10px; max-width:200px;"/>
+<br>
+<input type="text" id="avatar_x" readonly placeholder="X Koordinatı">
+<input type="text" id="avatar_y" readonly placeholder="Y Koordinatı">
+<input type="text" id="avatar_width" readonly placeholder="Genişlik">
+<input type="text" id="avatar_height" readonly placeholder="Yükseklik">
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+$(function() {
+  let img = new Image();
+  let cropStart = null;
+  let cropSize = 0;
+  let isDragging = false;
+  let canvas, ctx;
+  let naturalImgWidth, naturalImgHeight;
+  let offsetX, offsetY;
+  let scaleX, scaleY;
+
+  $("#avatar").on('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      img.src = event.target.result;
+      img.onload = function() {
+        openCropper();
+      };
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function openCropper() {
+    $("#cropModal").show();
+    canvas = document.getElementById('cropCanvas');
+    ctx = canvas.getContext('2d');
+
+    // Canvas boyutları, modal büyüklüğüne göre
+    const maxWidth = $("#cropModal").width() - 40;
+    const maxHeight = $("#cropModal").height() - 90;
+    let ratio = Math.min(maxWidth / img.width, maxHeight / img.height, 1);
+    canvas.width = img.width * ratio;
+    canvas.height = img.height * ratio;
+
+    naturalImgWidth = img.width;
+    naturalImgHeight = img.height;
+
+    // Resmi canvas boyutuna göre ölçeklendirme katsayıları
+    scaleX = naturalImgWidth / canvas.width;
+    scaleY = naturalImgHeight / canvas.height;
+
+    offsetX = canvas.getBoundingClientRect().left;
+    offsetY = canvas.getBoundingClientRect().top;
+
+    drawCanvas();
+
+    // Mouse olayları
+    $(canvas)
+      .off('mousedown mousemove mouseup')
+      .on('mousedown', startCrop)
+      .on('mousemove', duringCrop)
+      .on('mouseup', endCrop);
+  }
+
+  function drawCanvas(cropRect) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    if (cropRect) {
+      // Kırpma dışındaki alan optik koyulukla kapatılır
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      // Üst
+      ctx.fillRect(0, 0, canvas.width, cropRect.y);
+      // Alt
+      ctx.fillRect(0, cropRect.y + cropRect.size, canvas.width, canvas.height - (cropRect.y + cropRect.size));
+      // Sol
+      ctx.fillRect(0, cropRect.y, cropRect.x, cropRect.size);
+      // Sağ
+      ctx.fillRect(cropRect.x + cropRect.size, cropRect.y, canvas.width - (cropRect.x + cropRect.size), cropRect.size);
+
+      // Kırpma alanı çerçevesi
+      ctx.strokeStyle = '#0f0';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(cropRect.x, cropRect.y, cropRect.size, cropRect.size);
+    }
+  }
+
+  function startCrop(e) {
+    isDragging = true;
+    let rect = canvas.getBoundingClientRect();
+    cropStart = {
+      x: Math.min(Math.max(e.clientX - rect.left, 0), canvas.width),
+      y: Math.min(Math.max(e.clientY - rect.top, 0), canvas.height)
+    };
+  }
+
+  function duringCrop(e) {
+    if (!isDragging) return;
+    let rect = canvas.getBoundingClientRect();
+    let currentX = Math.min(Math.max(e.clientX - rect.left, 0), canvas.width);
+    let currentY = Math.min(Math.max(e.clientY - rect.top, 0), canvas.height);
+
+    let side = Math.min(Math.abs(currentX - cropStart.x), Math.abs(currentY - cropStart.y));
+
+    let cropRect = {
+      x: currentX < cropStart.x ? cropStart.x - side : cropStart.x,
+      y: currentY < cropStart.y ? cropStart.y - side : cropStart.y,
+      size: side
+    };
+
+    drawCanvas(cropRect);
+  }
+
+  function endCrop(e) {
+    if (!isDragging) return;
+    isDragging = false;
+
+    let rect = canvas.getBoundingClientRect();
+    let endX = Math.min(Math.max(e.clientX - rect.left, 0), canvas.width);
+    let endY = Math.min(Math.max(e.clientY - rect.top, 0), canvas.height);
+
+    let side = Math.min(Math.abs(endX - cropStart.x), Math.abs(endY - cropStart.y));
+    let cropX = endX < cropStart.x ? cropStart.x - side : cropStart.x;
+    let cropY = endY < cropStart.y ? cropStart.y - side : cropStart.y;
+
+    // Son kırpma koordinatlarını ve boyutunu sakla
+    cropStart = { x: cropX, y: cropY };
+    cropSize = side;
+
+    drawCanvas({x: cropX, y: cropY, size: side});
+  }
+
+  // Kırp ve önizle butonu
+  $('#cropConfirm').on('click', function() {
+    if (cropSize <= 0) {
+      alert("Lütfen kırpma alanı seçin.");
+      return;
+    }
+
+    // Kırpılan alanı orijinal resim boyutuna göre hesapla
+    let sx = cropStart.x * scaleX;
+    let sy = cropStart.y * scaleY;
+    let sSize = cropSize * scaleX; // scaleX ve scaleY eşit çünkü oran aynı
+
+    // Kırpılan resmi canvas'a aktar
+    let cropCanvas = document.createElement('canvas');
+    cropCanvas.width = sSize;
+    cropCanvas.height = sSize;
+    let cropCtx = cropCanvas.getContext('2d');
+    cropCtx.drawImage(img, sx, sy, sSize, sSize, 0, 0, sSize, sSize);
+
+    // Kırpılan resmi base64 olarak alıp preview olarak göster
+    let croppedDataUrl = cropCanvas.toDataURL('image/png');
+    $('#result').attr('src', croppedDataUrl);
+
+    // Ölçü ve koordinatları inputlara yaz
+    $('#avatar_x').val(Math.round(sx));
+    $('#avatar_y').val(Math.round(sy));
+    $('#avatar_width').val(Math.round(sSize));
+    $('#avatar_height').val(Math.round(sSize));
+
+    $("#cropModal").hide();
+  });
+
+  $('#cropCancel').on('click', function() {
+    $("#cropModal").hide();
+  });
+});
+</script>
